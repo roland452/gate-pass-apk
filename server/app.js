@@ -13,18 +13,23 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 
-
 mongoose.connect(MONGO_URI).then(() => {
     console.log('mongodb connection successful');
-}).catch((err) => console.error('mongodb connection failed:', err.message))
+}).catch((err) => {
+    console.log('mongodb connection failed');
+})
+
 
 app.use(cors({
-    origin:`${process.env.CLIENT_URL}`,
-    credentials: true
+    origin: function(origin, callback) {
+        callback(null, true)
+    },
+    credentials: true,
+    methods: ['GET','PUT','POST','PATCH','DELETE','OPTIONS'],
+    allowedHeaders:['Content-Type','Authorization','Cookie']
 }))
-app.use(cookieParser()) 
-app.use(express.json({ limit: '10mb'}))
-app.use(express.urlencoded({ limit: '10mb', extended: true}))
+app.use(cookieParser())
+app.use(express.json())
 app.use('/uploads',express.static(path.join(__dirname,'uploads'),{
     setHeaders: (res, path) => {
         res.setHeader('Content-Disposition','attachment')
