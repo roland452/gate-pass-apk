@@ -8,28 +8,27 @@ const router = express.Router();
 // Grouped by date, with filter support
 router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
   try {
-    const userId = req.user._id || req.user.userId;
+    const userId = req.user.userId;
     const { filter = 'all', page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Build direction filter
-    const directionFilter = filter === 'in' 
-      ? { direction: 'in' } 
-      : filter === 'out' 
-      ? { direction: 'out' } 
+    const directionFilter = filter === 'in'
+      ? { direction: 'in' }
+      : filter === 'out'
+      ? { direction: 'out' }
       : {};
 
-    // Find all logs where scannedBy is this user
-    // OR vehicle belongs to this user
+    // Find all logs scanned by this user
     const logs = await GateLog.find({
       scannedBy: userId,
       ...directionFilter
     })
-    .populate('vehicle', 'plateNumber make model color')
-    .populate('scannedBy', 'name')
-    .sort({ scannedAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit));
+      .populate('vehicle', 'plateNumber') // Vehicle schema only has plateNumber — no make/model/color
+      .populate('scannedBy', 'name')
+      .sort({ scannedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
     const total = await GateLog.countDocuments({
       scannedBy: userId,
@@ -50,8 +49,8 @@ router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
       } else if (date.toDateString() === yesterday.toDateString()) {
         dateKey = 'Yesterday';
       } else {
-        dateKey = date.toLocaleDateString('en-GB', { 
-          day: 'numeric', month: 'short', year: 'numeric' 
+        dateKey = date.toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'short', year: 'numeric'
         });
       }
 
@@ -63,9 +62,10 @@ router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
         denialReason: log.denialReason,
         gate: log.gate,
         scannedAt: log.scannedAt,
+        // FIX: previously read log.vehicle?.model — "model" collides with Mongoose's
+        // own doc.model() method, so it returned that function's source instead of
+        // undefined. plateNumber is the only field that actually exists on Vehicle.
         plateNumber: log.vehicle?.plateNumber || 'Unknown',
-        vehicleInfo: `${log.vehicle?.make || ''} ${log.vehicle?.model || ''}`.trim(),
-        color: log.vehicle?.color || ''
       });
     });
 
@@ -91,15 +91,15 @@ router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
 // GET stats summary
 router.get('/api/gate-logs/stats', userAuth, async (req, res) => {
   try {
-    const userId = req.user._id || req.user.userId;
+    const userId = req.user.userId;
 
     const [totalIn, totalOut, totalDenied, todayLogs] = await Promise.all([
       GateLog.countDocuments({ scannedBy: userId, direction: 'in', result: 'granted' }),
       GateLog.countDocuments({ scannedBy: userId, direction: 'out', result: 'granted' }),
       GateLog.countDocuments({ scannedBy: userId, result: 'denied' }),
-      GateLog.countDocuments({ 
+      GateLog.countDocuments({
         scannedBy: userId,
-        scannedAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
+        scannedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
       })
     ]);
 
@@ -109,6 +109,7 @@ router.get('/api/gate-logs/stats', userAuth, async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Gate logs stats error:', error);
     res.status(500).json({ message: 'Failed to fetch stats' });
   }
 });
