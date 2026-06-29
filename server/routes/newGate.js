@@ -4,13 +4,56 @@ import userAuth from '../controller/userAuth.js';
 
 const router = express.Router();
 
-// GET all gate logs for the current user's vehicles
-// Grouped by date, with filter support
+
 router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { filter = 'all', page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  
+    if (filter === 'pending') {
+      const Vehicle = (await import('../model/vehicle.js')).default;
+
+      const stillIn = await Vehicle.find({
+        status: 'approved',
+        currentLocation: 'in',
+      }).lean();
+
+      // For each still-checked-in vehicle, find its most recent "in" log for context
+      const vehicleIds = stillIn.map(v => v._id);
+      const lastInLogs = await GateLog.find({
+        vehicle: { $in: vehicleIds },
+        direction: 'in',
+      })
+        .sort({ scannedAt: -1 })
+        .lean();
+
+      // Map each vehicle to its latest "in" scan
+      const latestByVehicle = {};
+      lastInLogs.forEach(log => {
+        const key = log.vehicle.toString();
+        if (!latestByVehicle[key]) latestByVehicle[key] = log;
+      });
+
+      const pendingList = stillIn.map(v => ({
+        _id: latestByVehicle[v._id.toString()]?._id || v._id,
+        direction: 'in',
+        result: 'granted',
+        denialReason: null,
+        gate: latestByVehicle[v._id.toString()]?.gate || 'main',
+        scannedAt: latestByVehicle[v._id.toString()]?.scannedAt || v.updatedAt,
+        plateNumber: v.plateNumber,
+        vehicleId: v._id,
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data: [{ date: 'Currently checked in', logs: pendingList }],
+        hasMore: false,
+        total: pendingList.length,
+      });
+    }
 
     // Build direction filter
     const directionFilter = filter === 'in'
@@ -19,19 +62,16 @@ router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
       ? { direction: 'out' }
       : {};
 
-    // Find all logs scanned by this user
     const logs = await GateLog.find({
-      scannedBy: userId,
       ...directionFilter
     })
-      .populate('vehicle', 'plateNumber') // Vehicle schema only has plateNumber — no make/model/color
+      .populate('vehicle', 'plateNumber') 
       .populate('scannedBy', 'name')
       .sort({ scannedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await GateLog.countDocuments({
-      scannedBy: userId,
       ...directionFilter
     });
 
@@ -62,9 +102,6 @@ router.get('/api/gate-logs/my-history', userAuth, async (req, res) => {
         denialReason: log.denialReason,
         gate: log.gate,
         scannedAt: log.scannedAt,
-        // FIX: previously read log.vehicle?.model — "model" collides with Mongoose's
-        // own doc.model() method, so it returned that function's source instead of
-        // undefined. plateNumber is the only field that actually exists on Vehicle.
         plateNumber: log.vehicle?.plateNumber || 'Unknown',
       });
     });
@@ -94,11 +131,10 @@ router.get('/api/gate-logs/stats', userAuth, async (req, res) => {
     const userId = req.user.userId;
 
     const [totalIn, totalOut, totalDenied, todayLogs] = await Promise.all([
-      GateLog.countDocuments({ scannedBy: userId, direction: 'in', result: 'granted' }),
-      GateLog.countDocuments({ scannedBy: userId, direction: 'out', result: 'granted' }),
-      GateLog.countDocuments({ scannedBy: userId, result: 'denied' }),
+      GateLog.countDocuments({ direction: 'in', result: 'granted' }),
+      GateLog.countDocuments({ direction: 'out', result: 'granted' }),
+      GateLog.countDocuments({ result: 'denied' }),
       GateLog.countDocuments({
-        scannedBy: userId,
         scannedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
       })
     ]);
@@ -113,5 +149,50 @@ router.get('/api/gate-logs/stats', userAuth, async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch stats' });
   }
 });
+
+// GET full detail for a single gate log — shown when a card is tapped
+router.get('/api/gate-logs/:id/detail', userAuth, async (req, res) => {
+  try {
+    const log = await GateLog.findById(req.params.id)
+      .populate({
+        path: 'vehicle',
+        select: 'plateNumber owner currentLocation status',
+        populate: { path: 'owner', select: 'name email photoUrl type' },
+      })
+      .populate('scannedBy', 'name email')
+      .lean();
+
+    if (!log) return res.status(404).json({ message: 'Log not found' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: log._id,
+        direction: log.direction,
+        result: log.result,
+        denialReason: log.denialReason,
+        gate: log.gate,
+        scannedAt: log.scannedAt,
+        plateNumber: log.vehicle?.plateNumber || 'Unknown',
+        currentLocation: log.vehicle?.currentLocation,
+        scannedBy: log.scannedBy ? { name: log.scannedBy.name, email: log.scannedBy.email } : null,
+        owner: log.vehicle?.owner
+          ? {
+              name: log.vehicle.owner.name,
+              email: log.vehicle.owner.email,
+              photoUrl: log.vehicle.owner.photoUrl,
+              type: log.vehicle.owner.type,
+            }
+          : null,
+      },
+    });
+
+  } catch (error) {
+    console.error('Gate log detail error:', error);
+    res.status(500).json({ message: 'Failed to fetch log detail' });
+  }
+});
+
+
 
 export default router;
