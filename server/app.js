@@ -42,11 +42,12 @@ app.use('/uploads',express.static(path.join(__dirname,'uploads'),{
 import userRoutes from './routes/user.js'
 import vehicleRoutes from './routes/vehicle.js'
 import gatePassRoutes from './routes/gateLog.js' 
-
+import gate from './routes/gate.js'
 
 app.use(userRoutes)
 app.use(vehicleRoutes)
 app.use(gatePassRoutes)    
+app.use(gate)    
 
 
 
