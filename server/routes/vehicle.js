@@ -216,4 +216,41 @@ router.post('/api/vehicles/verify-scan', userAuth, async (req, res) => {
 });
 
 
+
+
+
+
+
+// DELETE: Remove a vehicle — matches QrCodePage's trash icon
+router.delete('/api/vehicles/:id', userAuth, async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+
+    // Only the owner can delete their own vehicle — never trust the :id alone
+    if (vehicle.owner.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'You can only delete your own vehicles' });
+    }
+
+    await Vehicle.findByIdAndDelete(req.params.id);
+
+    // Note: this does NOT delete past GateLog entries for this vehicle — that history
+    // stays intact for audit purposes even after the vehicle itself is removed.
+
+    res.status(200).json({ message: 'Vehicle deleted', id: req.params.id });
+
+  } catch (error) {
+    console.error('delete vehicle error:', error);
+    res.status(500).json({ message: 'Failed to delete vehicle' });
+  }
+});
+
+
+
+
+
+
 export default router;

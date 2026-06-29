@@ -72,6 +72,16 @@ const QrCodePage = () => {
 
   const atLimit = vehicles.length >= MAX_VEHICLES;
 
+  const handleDelete = async (vehicleId) => {
+    try {
+      await axios.delete(`/api/vehicles/${vehicleId}`);
+      setVehicles((prev) => prev.filter((v) => (v._id || v.id) !== vehicleId));
+      setToast('Vehicle removed');
+    } catch (err) {
+      setToast(err?.response?.data?.message || 'Failed to delete vehicle');
+    }
+  };
+
 
   return (
     <div style={{ background: COLORS.ink, color: COLORS.paper, minHeight: '100vh' }}>
@@ -127,9 +137,11 @@ const QrCodePage = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {vehicles.map((v) => (
-              <VehicleCard key={v._id || v.id} vehicle={v} />
-            ))}
+            <AnimatePresence>
+              {vehicles.map((v) => (
+                <VehicleCard key={v._id || v.id} vehicle={v} onDelete={handleDelete} />
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
@@ -209,15 +221,28 @@ const QrCodePage = () => {
   );
 };
 
-const VehicleCard = ({ vehicle }) => {
+const VehicleCard = ({ vehicle, onDelete }) => {
   const { plateNumber, status } = vehicle;
   const config = statusConfig[status] || statusConfig.pending;
   const Icon = config.icon;
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleTrashClick = () => {
+    if (deleting) return;
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setDeleting(true);
+    onDelete(vehicle._id || vehicle.id);
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97 }}
       className="rounded-2xl p-5 border"
       style={{ borderColor: 'rgba(245,241,232,0.1)', background: 'rgba(245,241,232,0.03)' }}
     >
@@ -259,16 +284,49 @@ const VehicleCard = ({ vehicle }) => {
           Waiting on admin approval — you'll see your QR code here once approved.
         </p>
       )}
-      <FaTrash
-        size={16}
-        className="cursor-pointer mt-5 hover:text-red-500 transition-colors"
-        onClick={() => alert('Delete functionality not implemented yet.')}
-      />
+      <div className="flex items-center justify-between mt-5">
+        {confirming ? (
+          <div className="flex items-center gap-3 text-xs" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            <span style={{ color: COLORS.sage }}>Remove this vehicle?</span>
+            <button
+              onClick={handleTrashClick}
+              disabled={deleting}
+              className="font-semibold px-3 py-1 rounded-full"
+              style={{ background: `${COLORS.denied}1A`, color: COLORS.denied }}
+            >
+              {deleting ? 'Removing…' : 'Confirm'}
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={deleting}
+              className="font-medium"
+              style={{ color: COLORS.sage }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <FaTrash
+            size={16}
+            className="cursor-pointer hover:text-red-500 transition-colors"
+            style={{ color: COLORS.sage }}
+            onClick={handleTrashClick}
+          />
+        )}
+      </div>
     </motion.div>
   );
 };
 
 export default QrCodePage;
+
+
+
+
+
+
+
+
 
 
 
