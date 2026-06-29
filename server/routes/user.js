@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../model/user.js';
 import Vehicle from '../model/vehicle.js';
 import userAuth from '../controller/userAuth.js';
+import Upload from '../multer.js';
 
 const router = express.Router();
 
@@ -139,5 +140,39 @@ router.get('/api/user-auth', userAuth, async(req, res, next) => {
     res.json({authenticated: true})
     next() 
 })
+
+
+
+
+
+// PATCH: Upload/replace profile photo — matches ProfilePage's clickable avatar
+router.patch('/api/profile/photo', userAuth, Upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file received' });
+    }
+
+  
+    if (!req.file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ message: 'Profile picture must be an image' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+   
+    user.photoUrl = req.file.path;
+    await user.save();
+
+    res.status(200).json({ photoUrl: user.photoUrl });
+
+  } catch (error) {
+    console.error('photo upload error:', error);
+    res.status(500).json({ message: 'Failed to upload photo' });
+  }
+});
+
+
+
 
 export default router; 
