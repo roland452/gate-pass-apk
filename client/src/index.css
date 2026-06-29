@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+@theme{
+
+    --d-b:var(--d-bg);
+    --d-s:var(--d-s);
+    --d-t:var(--d-t);
+    --d-shadow:var(--d-shadow);
+
+
+    --l-g:var(--l-bg);
+    --l-s:var(--l-s);
+    --l-t:var(--l-t);
+    --l-shadow:var(--l-shadow);
+
+    
+    --color-main: var(--bg-main);
+    --color-secondary: var(--bg-secondary);
+    --color-primary:var(--bg-primary);
+    --text-base: var(--text-color);
+    --active-base: var(--active-color);
+
+}
+
+:root{
+    --d-bg:rgb(1, 11, 18);
+    /* --d-bg:#05110c; */
+    --d-s:rgb(3, 23, 37);
+    --d-t:rgb(255, 255, 255);
+    --d-shadow:rgba(26, 25, 25, 0.866);
+
+    --l-bg:white;
+    --l-s:white;
+    --l-t:#000000;
+    --l-shadow:rgb(214, 206, 206);
+
+}
+
+
+
+
+
+html.dark-blue, .dark-blue{
+    --bg-main:#01193f;
+    --bg-secondary:#001223;
+    --bg-primary:#3880e4;
+    --text-color:#3385ff;
+    --active-color:#3385ff;
+}
+
+        
+html.dark-pink, .dark-pink{
+    --bg-main:#a30c4e;
+    --bg-secondary:#d01465;
+    --bg-primary:#58042e;
+    --text-color:black;
+    --active-color:#df4592;
+}
+
+html.light-pink, .light-pink{
+    --bg-main:rgb(56, 3, 82);
+    --bg-secondary:#1c0232;
+    --bg-primary:rgb(190, 75, 171);
+    --text-color:#bb1ce3;
+    --active-color:#d36bd3;
+}
+
+html.light-blue, .light-blue{
+    --bg-main:rgb(75, 139, 235);
+    --bg-secondary:#6ca3e9;
+    --bg-primary:rgb(2, 18, 59);
+    --text-color:#36393c;
+    --active-color:rgb(6, 29, 96)
+}
+
+html.green, .green{
+    --bg-main:#022309;
+    --bg-secondary:#187507;
+    --bg-primary:#0fb324;
+    --text-color:black;
+    --active-color:#15c40f;
+} 
+
+html.black, .black{
+    --bg-main:rgb(90, 56, 43);
+    --bg-secondary:rgb(200, 70, 50);
+    --bg-primary:rgb(166, 67, 67);
+    --text-color:rgb(255, 255, 255);
+    --active-color:rgb(238, 94, 17);
+} 
+
+@layer utilities{
+    .scrollbar-hide::-webkit-scrollbar{
+        display: none;
+    }
+    .scrollbar-hide{
+        -ms-over-flow-style:none;
+        scrollbar-width:none;
+    }
+}
+
+
+
+
+body{
+    transition: .5s ease-in-out;
+    button{
+        outline: none;
+        cursor:pointer;
+    }
+
+    .pending{
+        color:rgb(196, 233, 12);
+    }
+
+    .accepted{
+        color:rgb(36, 197, 15);
+    }
+
+    .rejected{
+        color:rgba(251, 0, 0, 0.643);
+    }
+}
+    
+
+
+
