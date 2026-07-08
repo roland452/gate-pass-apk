@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios'
 import { motion, AnimatePresence } from 'framer-motion';
-import { HiOutlineMail, HiOutlineLockClosed, HiOutlineUser, HiOutlineArrowLeft } from 'react-icons/hi';
+import { HiOutlineMail, HiOutlineLockClosed, HiOutlineUser, HiOutlineArrowLeft, HiOutlineIdentification } from 'react-icons/hi';
 import { BsArrowRight, BsCheckCircleFill } from 'react-icons/bs';
 import { useNavigate } from 'react-router-dom';
 import useContext from '../../context/context';
@@ -27,12 +27,17 @@ const AuthPage = () => {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
 
   // shared fields
-  const [email, setEmail] = useState('');
+  const [idNumber, setIdNumber] = useState('');
   const [password, setPassword] = useState('');
 
   // signup-only fields
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [type, setType] = useState('student');
+
+  const idLabel = mode === 'login'
+    ? 'Matriculation / Staff ID number'
+    : type === 'student' ? 'Matriculation number' : 'Staff ID number';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,13 +49,13 @@ const AuthPage = () => {
 
     try {
       if (mode === 'signup') {
-        const res = await axios.post('/api/signup',{ name, email, password, type },{ withCredentials: true })
+        const res = await axios.post('/api/signup',{ name, email, idNumber, password, type },{ withCredentials: true })
         const mes = res.data.message
         setMode('login')
         setToast(mes? mes : 'signup was successful')
         
       } else {
-        const res = await axios.post('/api/login',{ email, password },{ withCredentials: true })
+        const res = await axios.post('/api/login',{ idNumber, password },{ withCredentials: true })
         setToast('login successfully')
         navigate('/profile')
         
@@ -148,13 +153,25 @@ const AuthPage = () => {
                   />
                 )}
 
-                {/* Email — both */}
+                {/* Email — signup only (contact info, not used for login) */}
+                {mode === 'signup' && (
+                  <Field
+                    icon={<HiOutlineMail size={18} />}
+                    type="email"
+                    placeholder="Email address"
+                    value={email}
+                    onChange={setEmail}
+                    required
+                  />
+                )}
+
+                {/* Matriculation / Staff ID — both, this is the login credential */}
                 <Field
-                  icon={<HiOutlineMail size={18} />}
-                  type="email"
-                  placeholder="Email address"
-                  value={email}
-                  onChange={setEmail}
+                  icon={<HiOutlineIdentification size={18} />}
+                  type="text"
+                  placeholder={idLabel}
+                  value={idNumber}
+                  onChange={setIdNumber}
                   required
                 />
 

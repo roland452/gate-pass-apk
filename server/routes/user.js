@@ -10,16 +10,22 @@ const router = express.Router();
 
 // 1. POST: Signup
 router.post('/api/signup', async (req, res) => {
-    const { name, email, password, type } = req.body;
+    const { name, email, idNumber, password, type } = req.body;
 
     try {
-        if (!name || !email || !password || !type) {
+        if (!name || !email || !idNumber || !password || !type) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        const existing = await User.findOne({ email: email.toLowerCase() });
+        const existing = await User.findOne({
+            $or: [{ email: email.toLowerCase() }, { idNumber: idNumber.trim() }],
+        });
         if (existing) {
-            return res.status(409).json({ message: 'An account with this email already exists' });
+            return res.status(409).json({
+                message: existing.idNumber === idNumber.trim()
+                    ? 'An account with this matriculation/staff ID already exists'
+                    : 'An account with this email already exists',
+            });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,6 +33,7 @@ router.post('/api/signup', async (req, res) => {
         const newUser = new User({
             name,
             email: email.toLowerCase(),
+            idNumber: idNumber.trim(),
             password: hashedPassword,
             type,
         });
@@ -50,7 +57,7 @@ router.post('/api/signup', async (req, res) => {
         res.status(201).json({
             authenticated: true,
             token, // ← return token in body for mobile app
-            user: { id: newUser._id, name: newUser.name, email: newUser.email, type: newUser.type, role: newUser.type },
+            user: { id: newUser._id, name: newUser.name, email: newUser.email, idNumber: newUser.idNumber, type: newUser.type, role: newUser.type },
         });
 
     } catch (error) {
@@ -62,21 +69,21 @@ router.post('/api/signup', async (req, res) => {
 
 // 2. POST: Login
 router.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { idNumber, password } = req.body;
 
     try {
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
+        if (!idNumber || !password) {
+            return res.status(400).json({ message: 'Matriculation/Staff ID and password are required' });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({ idNumber: idNumber.trim() });
         if (!user) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({ message: 'Invalid ID or password' });
         }
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({ message: 'Invalid ID or password' });
         }
 
         // ← include type in JWT so admin checks work
@@ -96,7 +103,7 @@ router.post('/api/login', async (req, res) => {
         res.status(200).json({
             authenticated: true,
             token, // ← return token in body for mobile app
-            user: { id: user._id, name: user.name, email: user.email, type: user.type, role: user.type },
+            user: { id: user._id, name: user.name, email: user.email, idNumber: user.idNumber, type: user.type, role: user.type },
         });
 
     } catch (error) {
@@ -117,7 +124,7 @@ router.post('/api/logout', (req, res) => {
 router.get('/api/profile', userAuth, async (req, res) => {
     try {
         const user = await User.findById(req.user.userId)
-            .select('name email type photoUrl')
+            .select('name email idNumber type photoUrl')
             .lean();
 
         if (!user) return res.status(404).json({ message: 'User not found' });
@@ -140,9 +147,6 @@ router.get('/api/user-auth', userAuth, async(req, res, next) => {
     res.json({authenticated: true})
     next() 
 })
-
-
-
 
 
 // PATCH: Upload/replace profile photo — matches ProfilePage's clickable avatar

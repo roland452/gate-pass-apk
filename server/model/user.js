@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+
+  // ← Matriculation number (students) or Staff ID (lecturers/other).
+  // This is the field used for login, not email.
+  idNumber: { type: String, required: true, unique: true, trim: true },
+
   password: { type: String, required: true },
 
   type: {

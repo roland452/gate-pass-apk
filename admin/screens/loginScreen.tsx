@@ -10,30 +10,30 @@ import useToast from '../context/toast';
 
 
 type Props = {
-  onLogin: (user: { name: string; email: string; token: string; role: string }) => void;
+  onLogin: (user: { name: string; idNumber: string; token: string; role: string }) => void;
 };
 
 export default function LoginScreen({ onLogin }: Props) {
-  const [email, setEmail] = useState('');
+  const [idNumber, setIdNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const setToast = useToast((state) => state.setToast);
   
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setToast('Please enter your email and password', 'info');
+    if (!idNumber.trim() || !password.trim()) {
+      setToast('Please enter your staff ID and password', 'info');
       return;
     }
     setLoading(true);
     try {
       const res = await axios.post(`${API_URL}/api/login`, {
-        email: email.trim().toLowerCase(),
+        idNumber: idNumber.trim(),
         password,
       });
       onLogin({
         name: res.data.user.name,
-        email: res.data.user.email,
+        idNumber: res.data.user.idNumber,
         token: res.data.token,
         role: res.data.user.role || res.data.user.type || 'officer',
       });
@@ -60,17 +60,16 @@ export default function LoginScreen({ onLogin }: Props) {
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Staff ID</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color="#4A6060" style={{ marginRight: 10 }} />
+              <Ionicons name="card-outline" size={18} color="#4A6060" style={{ marginRight: 10 }} />
               <TextInput
                 style={styles.input}
-                placeholder="officer@example.com"
+                placeholder="e.g. STF-00231"
                 placeholderTextColor="#4A6060"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
+                value={idNumber}
+                onChangeText={setIdNumber}
+                autoCapitalize="characters"
                 returnKeyType="next"
               />
             </View>

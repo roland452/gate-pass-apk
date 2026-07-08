@@ -10,7 +10,7 @@ import useToast from './context/toast';
 
 export type AuthUser = {
   name: string;
-  email: string;
+  idNumber: string;
   token: string;
   role: string;
 };
