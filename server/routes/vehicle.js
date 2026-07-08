@@ -5,31 +5,12 @@ import path from 'path';
 import Vehicle from '../model/vehicle.js';
 import GateLog from '../model/gateLog.js';
 import userAuth from '../controller/userAuth.js';
+import Upload from '../multer.js'
 
 const router = express.Router();
 const MAX_VEHICLES_PER_USER = 3;
 
-// Proof-of-ownership uploads (optional field on the registration form) —
-// stored on disk, served statically from /uploads elsewhere in the app.
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/proof-of-ownership'),
-    filename: (req, file, cb) => {
-        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
-        cb(null, `${unique}${path.extname(file.originalname)}`);
-    },
-});
 
-const upload = multer({
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-    fileFilter: (req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-        if (!allowed.includes(file.mimetype)) {
-            return cb(new Error('Only JPG, PNG, WEBP, or PDF files are allowed'));
-        }
-        cb(null, true);
-    },
-});
 
 // Signs a permanent payload for an approved vehicle's QR code.
 // HMAC, not JWT — this token never expires, so a JWT's built-in exp handling isn't useful here.
@@ -69,7 +50,7 @@ function verifyVehiclePayload(token) {
 // 1. POST: Request a new vehicle — matches the updated Vehicle Registration form
 // (owner name, matric/staff ID, department/faculty, make & model, plate, colour,
 // phone number, plus an optional proof-of-ownership upload).
-router.post('/api/vehicles/request', userAuth, upload.single('proofOfOwnership'), async (req, res) => {
+router.post('/api/vehicles/request', userAuth, Upload.single('proofOfOwnership'), async (req, res) => {
     const {
         ownerName,
         idNumber,          // matriculation number (student) or staff ID (staff)
