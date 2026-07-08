@@ -124,7 +124,7 @@ router.get('/api/vehicles/mine', userAuth, async (req, res) => {
 // 3. GET: All pending requests — for admin review screen
 router.get('/api/vehicles/pending', userAuth, async (req, res) => {
     try {
-        if (req.user.role !== 'admin') {
+        if (req.user.role !== 'Admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
 

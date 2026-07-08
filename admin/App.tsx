@@ -24,12 +24,12 @@ export default function App() {
     return <LoginScreen onLogin={(userData) => setUser(userData)} />;
   }
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'Admin';
 
   return (
     <View style={styles.container}>
 
-      <Toast />
+      {/* <Toast /> */}
 
       {screen === 'scan' && <ScanScreen token={user.token} />}
       {screen === 'history' && <HistoryScreen token={user.token} />}
