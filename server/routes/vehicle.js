@@ -145,7 +145,7 @@ router.get('/api/vehicles/pending', userAuth, async (req, res) => {
 // 4. PATCH: Approve a vehicle — generates the permanent QR token
 router.patch('/api/vehicles/:id/approve', userAuth, async (req, res) => {
     try {
-        if (req.user.role !== 'admin') {
+        if (req.user.role !== 'Admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
 
@@ -172,7 +172,7 @@ router.patch('/api/vehicles/:id/deny', userAuth, async (req, res) => {
     const { reason } = req.body;
 
     try {
-        if (req.user.role !== 'admin') {
+        if (req.user.role !== 'Admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
 
