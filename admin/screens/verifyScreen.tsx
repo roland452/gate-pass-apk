@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, SafeAreaView, Alert, RefreshControl, Modal,
-  TextInput
+  TextInput, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -13,7 +13,15 @@ type Props = { token: string };
 
 type Vehicle = {
   _id: string;
+  ownerName: string;
+  idNumber: string;
+  department: string;
+  vehicleMake: string;
+  vehicleModel: string;
   plateNumber: string;
+  vehicleColour: string;
+  phoneNumber: string;
+  proofOfOwnershipUrl: string | null;
   status: string;
   owner: { name: string; email: string; type: string };
   createdAt: string;
@@ -171,10 +179,20 @@ export default function VerifyScreen({ token }: Props) {
                 <View style={styles.plateBox}>
                   <Ionicons name="car-outline" size={16} color="#4CAF8A" />
                   <Text style={styles.plate}>{item.plateNumber}</Text>
+                  {!!item.vehicleColour && <Text style={styles.vehicleMeta}>{item.vehicleColour}</Text>}
                 </View>
-                <Text style={styles.ownerName}>{item.owner?.name}</Text>
-                <Text style={styles.ownerEmail}>{item.owner?.email}</Text>
+                {(item.vehicleMake || item.vehicleModel) && (
+                  <Text style={styles.vehicleMeta}>{[item.vehicleMake, item.vehicleModel].filter(Boolean).join(' ')}</Text>
+                )}
+                <Text style={styles.ownerName}>{item.ownerName || item.owner?.name}</Text>
+                <Text style={styles.ownerEmail}>{item.idNumber} · {item.department}</Text>
+                <Text style={styles.ownerEmail}>{item.phoneNumber}</Text>
                 <Text style={styles.ownerType}>{item.owner?.type}</Text>
+                {item.proofOfOwnershipUrl && (
+                  <TouchableOpacity onPress={() => Linking.openURL(`${API_URL}${item.proofOfOwnershipUrl}`)}>
+                    <Text style={styles.proofLink}>View proof of ownership</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={styles.requestActions}>
                 <TouchableOpacity
@@ -308,6 +326,8 @@ const styles = StyleSheet.create({
   ownerName: { color: '#E8F0EE', fontSize: 14, fontWeight: '600' },
   ownerEmail: { color: '#6B8080', fontSize: 12 },
   ownerType: { color: '#4CAF8A', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  vehicleMeta: { color: '#6B8080', fontSize: 12, fontWeight: '600' },
+  proofLink: { color: '#4CAF8A', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline', marginTop: 2 },
   requestActions: { flexDirection: 'row', gap: 10 },
   approveBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#4CAF8A', paddingVertical: 12, borderRadius: 12 },
   denyBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#E05555', paddingVertical: 12, borderRadius: 12 },

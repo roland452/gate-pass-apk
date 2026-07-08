@@ -1,11 +1,35 @@
 import express from 'express';
 import crypto from 'crypto';
+import multer from 'multer';
+import path from 'path';
 import Vehicle from '../model/vehicle.js';
 import GateLog from '../model/gateLog.js';
 import userAuth from '../controller/userAuth.js';
 
 const router = express.Router();
 const MAX_VEHICLES_PER_USER = 3;
+
+// Proof-of-ownership uploads (optional field on the registration form) —
+// stored on disk, served statically from /uploads elsewhere in the app.
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'uploads/proof-of-ownership'),
+    filename: (req, file, cb) => {
+        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+        cb(null, `${unique}${path.extname(file.originalname)}`);
+    },
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowed.includes(file.mimetype)) {
+            return cb(new Error('Only JPG, PNG, WEBP, or PDF files are allowed'));
+        }
+        cb(null, true);
+    },
+});
 
 // Signs a permanent payload for an approved vehicle's QR code.
 // HMAC, not JWT — this token never expires, so a JWT's built-in exp handling isn't useful here.
@@ -42,14 +66,30 @@ function verifyVehiclePayload(token) {
 }
 
 
-// 1. POST: Request a new vehicle — matches QrCodePage's "Add vehicle" form (plateNumber only)
-router.post('/api/vehicles/request', userAuth, async (req, res) => {
-    const { plateNumber } = req.body;
+// 1. POST: Request a new vehicle — matches the updated Vehicle Registration form
+// (owner name, matric/staff ID, department/faculty, make & model, plate, colour,
+// phone number, plus an optional proof-of-ownership upload).
+router.post('/api/vehicles/request', userAuth, upload.single('proofOfOwnership'), async (req, res) => {
+    const {
+        ownerName,
+        idNumber,          // matriculation number (student) or staff ID (staff)
+        department,        // department or faculty
+        vehicleMake,
+        vehicleModel,
+        plateNumber,
+        vehicleColour,
+        phoneNumber,
+    } = req.body;
     const owner = req.user.userId;
 
+    const requiredFields = { ownerName, idNumber, department, vehicleMake, vehicleModel, plateNumber, vehicleColour, phoneNumber };
+    const missing = Object.entries(requiredFields)
+        .filter(([, value]) => !value || !value.toString().trim())
+        .map(([key]) => key);
+
     try {
-        if (!plateNumber || !plateNumber.trim()) {
-            return res.status(400).json({ message: 'Plate number is required' });
+        if (missing.length) {
+            return res.status(400).json({ message: `Missing required field(s): ${missing.join(', ')}` });
         }
 
         const existingCount = await Vehicle.countDocuments({ owner });
@@ -59,7 +99,15 @@ router.post('/api/vehicles/request', userAuth, async (req, res) => {
 
         const vehicle = new Vehicle({
             owner,
+            ownerName: ownerName.trim(),
+            idNumber: idNumber.trim().toUpperCase(),
+            department: department.trim(),
+            vehicleMake: vehicleMake.trim(),
+            vehicleModel: vehicleModel.trim(),
             plateNumber: plateNumber.trim().toUpperCase(),
+            vehicleColour: vehicleColour.trim(),
+            phoneNumber: phoneNumber.trim(),
+            proofOfOwnershipUrl: req.file ? `/uploads/proof-of-ownership/${req.file.filename}` : null,
             status: 'pending',
         });
 
@@ -207,6 +255,9 @@ router.post('/api/vehicles/verify-scan', userAuth, async (req, res) => {
             direction,
             owner: { name: vehicle.owner.name, photoUrl: vehicle.owner.photoUrl },
             plateNumber: vehicle.plateNumber,
+            vehicleMake: vehicle.vehicleMake,
+            vehicleModel: vehicle.vehicleModel,
+            vehicleColour: vehicle.vehicleColour,
         });
 
     } catch (error) {

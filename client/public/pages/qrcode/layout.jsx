@@ -33,9 +33,23 @@ const QrCodePage = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [plate, setPlate] = useState('');
+  const emptyForm = {
+    ownerName: '',
+    idNumber: '',
+    department: '',
+    vehicleMake: '',
+    vehicleModel: '',
+    plateNumber: '',
+    vehicleColour: '',
+    phoneNumber: '',
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [proofFile, setProofFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const updateField = (field) => (e) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const fetchVehicles = async () => {
     try {
@@ -54,14 +68,25 @@ const QrCodePage = () => {
 
   const handleSubmitRequest = async (e) => {
     e.preventDefault();
-    if (!plate.trim()) return;
+    const missing = Object.entries(form).some(([, value]) => !value.trim());
+    if (missing) {
+      setError('Please fill in all fields.');
+      return;
+    }
     setError('');
     setSubmitting(true);
 
     try {
-      const res = await axios.post('/api/vehicles/request', { plateNumber: plate.trim() });
+      const payload = new FormData();
+      Object.entries(form).forEach(([key, value]) => payload.append(key, value.trim()));
+      if (proofFile) payload.append('proofOfOwnership', proofFile);
+
+      const res = await axios.post('/api/vehicles/request', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setVehicles((prev) => [...prev, res.data]);
-      setPlate('');
+      setForm(emptyForm);
+      setProofFile(null);
       setShowForm(false);
     } catch (err) {
       setError(err?.response?.data?.message || 'Could not submit request. Try again.');
@@ -162,7 +187,7 @@ const QrCodePage = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl p-6"
+              className="w-full max-w-sm rounded-2xl p-6 max-h-[85vh] overflow-y-auto"
               style={{ background: COLORS.ink, border: '1px solid rgba(245,241,232,0.12)' }}
             >
               <div className="flex items-center justify-between mb-5">
@@ -175,26 +200,37 @@ const QrCodePage = () => {
               </div>
 
               <form onSubmit={handleSubmitRequest} className="space-y-4">
+                <FormField label="Owner's name" value={form.ownerName} onChange={updateField('ownerName')} placeholder="e.g. Amina Yusuf" autoFocus />
+                <FormField label="Matric / Staff ID" value={form.idNumber} onChange={updateField('idNumber')} placeholder="e.g. CST/20/1234" />
+                <FormField label="Department / Faculty" value={form.department} onChange={updateField('department')} placeholder="e.g. Computer Science" />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Vehicle make" value={form.vehicleMake} onChange={updateField('vehicleMake')} placeholder="e.g. Toyota" />
+                  <FormField label="Vehicle model" value={form.vehicleModel} onChange={updateField('vehicleModel')} placeholder="e.g. Corolla" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    label="Plate number"
+                    value={form.plateNumber}
+                    onChange={(e) => setForm((p) => ({ ...p, plateNumber: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. KJA 204 XY"
+                  />
+                  <FormField label="Vehicle colour" value={form.vehicleColour} onChange={updateField('vehicleColour')} placeholder="e.g. Silver" />
+                </div>
+                <FormField label="Phone number" value={form.phoneNumber} onChange={updateField('phoneNumber')} placeholder="e.g. 08012345678" type="tel" />
+
                 <div>
                   <label
                     className="text-xs font-semibold uppercase tracking-widest mb-2 block"
                     style={{ color: COLORS.sage, fontFamily: 'Inter, system-ui, sans-serif' }}
                   >
-                    Plate number
+                    Proof of ownership <span className="normal-case font-normal">(optional)</span>
                   </label>
                   <input
-                    type="text"
-                    value={plate}
-                    onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                    placeholder="e.g. KJA 204 XY"
-                    autoFocus
-                    className="w-full px-4 py-3 rounded-xl outline-none text-sm tracking-wider"
-                    style={{
-                      background: 'rgba(245,241,232,0.04)',
-                      border: '1px solid rgba(245,241,232,0.15)',
-                      color: COLORS.paper,
-                      fontFamily: 'Inter, system-ui, sans-serif',
-                    }}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold"
+                    style={{ color: COLORS.sage, fontFamily: 'Inter, system-ui, sans-serif' }}
                   />
                 </div>
 
@@ -221,8 +257,33 @@ const QrCodePage = () => {
   );
 };
 
+const FormField = ({ label, value, onChange, placeholder, autoFocus, type = 'text' }) => (
+  <div>
+    <label
+      className="text-xs font-semibold uppercase tracking-widest mb-2 block"
+      style={{ color: COLORS.sage, fontFamily: 'Inter, system-ui, sans-serif' }}
+    >
+      {label}
+    </label>
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      className="w-full px-4 py-3 rounded-xl outline-none text-sm tracking-wide"
+      style={{
+        background: 'rgba(245,241,232,0.04)',
+        border: '1px solid rgba(245,241,232,0.15)',
+        color: COLORS.paper,
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    />
+  </div>
+);
+
 const VehicleCard = ({ vehicle, onDelete }) => {
-  const { plateNumber, status } = vehicle;
+  const { plateNumber, status, vehicleMake, vehicleModel, vehicleColour } = vehicle;
   const config = statusConfig[status] || statusConfig.pending;
   const Icon = config.icon;
   const [confirming, setConfirming] = useState(false);
@@ -261,6 +322,12 @@ const VehicleCard = ({ vehicle, onDelete }) => {
           {config.label}
         </span>
       </div>
+
+      {(vehicleMake || vehicleModel || vehicleColour) && (
+        <p className="text-xs mb-3" style={{ color: COLORS.sage, fontFamily: 'Inter, system-ui, sans-serif' }}>
+          {[vehicleColour, vehicleMake, vehicleModel].filter(Boolean).join(' · ')}
+        </p>
+      )}
 
       {status === 'approved' && vehicle.qrToken && (
         <div className="flex flex-col items-center pt-2 pb-1">

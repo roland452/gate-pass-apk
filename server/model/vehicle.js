@@ -1,34 +1,36 @@
 import mongoose from 'mongoose';
 
-const VehicleSchema = new mongoose.Schema({
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-  plateNumber: { type: String, required: true, uppercase: true, trim: true },
 
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'denied'],
-    default: 'pending',
-  },
+const vehicleSchema = new mongoose.Schema(
+    {
+        owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
- 
-  qrToken: { type: String, default: null },
+        // --- Fields collected on the registration form ---
+        ownerName: { type: String, required: true, trim: true },
+        idNumber: { type: String, required: true, trim: true, uppercase: true }, // matric no. or staff ID
+        department: { type: String, required: true, trim: true }, // department or faculty
+        vehicleMake: { type: String, required: true, trim: true },
+        vehicleModel: { type: String, required: true, trim: true },
+        plateNumber: { type: String, required: true, trim: true, uppercase: true },
+        vehicleColour: { type: String, required: true, trim: true },
+        phoneNumber: { type: String, required: true, trim: true },
+        proofOfOwnershipUrl: { type: String, default: null }, // optional upload
 
-  deniedReason: { type: String, default: null },
+        // --- Approval workflow ---
+        status: { type: String, enum: ['pending', 'approved', 'denied'], default: 'pending' },
+        qrToken: { type: String, default: null },
+        approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        approvedAt: { type: Date, default: null },
+        deniedReason: { type: String, default: null },
 
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  approvedAt: { type: Date, default: null },
+        // --- Gate tracking ---
+        currentLocation: { type: String, enum: ['in', 'out'], default: 'out' },
+    },
+    { timestamps: true }
+);
 
- 
-  currentLocation: {
-    type: String,
-    enum: ['in', 'out'],
-    default: 'out',
-  },
+// One plate per owner — mirrors the 409 duplicate-plate handling in routes/vehicle.js
+vehicleSchema.index({ owner: 1, plateNumber: 1 }, { unique: true });
 
-}, { timestamps: true });
-
-VehicleSchema.index({ owner: 1, plateNumber: 1 }, { unique: true });
-
-const Vehicle = mongoose.model('Vehicle', VehicleSchema);
-export default Vehicle;
+export default mongoose.model('Vehicle', vehicleSchema);
