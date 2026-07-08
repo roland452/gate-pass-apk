@@ -61,7 +61,7 @@ router.post('/api/signup', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('signup error:', error);
+        console.log('signup error:', error);
         res.status(500).json({ message: 'Signup failed' });
     }
 });
@@ -107,7 +107,7 @@ router.post('/api/login', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('login error:', error);
+        console.log('login error:', error);
         res.status(500).json({ message: 'Login failed' });
     }
 });
