@@ -10,6 +10,16 @@ import Upload from '../multer.js'
 const router = express.Router();
 const MAX_VEHICLES_PER_USER = 3;
 
+// Proof-of-ownership uploads (optional field on the registration form) —
+// stored on disk, served statically from /uploads elsewhere in the app.
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'uploads/proof-of-ownership'),
+    filename: (req, file, cb) => {
+        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+        cb(null, `${unique}${path.extname(file.originalname)}`);
+    },
+});
+
 
 
 // Signs a permanent payload for an approved vehicle's QR code.
@@ -138,6 +148,29 @@ router.get('/api/vehicles/pending', userAuth, async (req, res) => {
     } catch (error) {
         console.error('fetch pending error:', error);
         res.status(500).json({ message: 'Failed to fetch pending requests' });
+    }
+});
+
+
+// 3b. GET: Full detail of a single vehicle, with the owner's full profile —
+// backs the gate officer's "View details" modal (tapping a plate/car icon).
+router.get('/api/vehicles/:id/details', userAuth, async (req, res) => {
+    try {
+        if (req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        const vehicle = await Vehicle.findById(req.params.id)
+            .populate('owner', '-password') // full owner profile, minus the password hash
+            .lean();
+
+        if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+
+        res.status(200).json(vehicle);
+
+    } catch (error) {
+        console.error('fetch vehicle details error:', error);
+        res.status(500).json({ message: 'Failed to fetch vehicle details' });
     }
 });
 

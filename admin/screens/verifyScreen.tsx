@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, SafeAreaView, Alert, RefreshControl, Modal,
-  TextInput
+  TextInput, ScrollView, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -17,6 +17,22 @@ type Vehicle = {
   status: string;
   owner: { name: string; email: string; type: string };
   createdAt: string;
+};
+
+// Full detail payload from GET /api/vehicles/:id/details — owner is fully
+// populated (minus password) rather than the trimmed name/email/type used
+// in the pending list, so this may contain fields beyond what's typed here.
+type VehicleDetail = Vehicle & {
+  ownerName?: string;
+  idNumber?: string;
+  department?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColour?: string;
+  phoneNumber?: string;
+  proofOfOwnershipUrl?: string | null;
+  owner: Record<string, any>;
+  [key: string]: any;
 };
 
 type GateLog = {
@@ -39,10 +55,28 @@ export default function VerifyScreen({ token }: Props) {
   const [denyModal, setDenyModal] = useState(false);
   const [denyReason, setDenyReason] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [detailModal, setDetailModal] = useState(false);
+  const [detail, setDetail] = useState<VehicleDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const setToast = useToast((state) => state.setToast);
 
 
   const headers = { Authorization: `Bearer ${token}` };
+
+  const openDetails = async (vehicleId: string) => {
+    setDetailModal(true);
+    setDetailLoading(true);
+    setDetail(null);
+    try {
+      const res = await axios.get(`${API_URL}/api/vehicles/${vehicleId}/details`, { headers });
+      setDetail(res.data);
+    } catch (err: any) {
+      setToast(err?.response?.data?.message || 'Failed to fetch vehicle details', 'error');
+      setDetailModal(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const fetchPending = async () => {
     try {
@@ -167,15 +201,16 @@ export default function VerifyScreen({ token }: Props) {
           }
           renderItem={({ item }) => (
             <View style={styles.requestCard}>
-              <View style={styles.requestInfo}>
+              <TouchableOpacity style={styles.requestInfo} onPress={() => openDetails(item._id)} activeOpacity={0.7}>
                 <View style={styles.plateBox}>
                   <Ionicons name="car-outline" size={16} color="#4CAF8A" />
                   <Text style={styles.plate}>{item.plateNumber}</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#6B8080" style={{ marginLeft: 2 }} />
                 </View>
                 <Text style={styles.ownerName}>{item.owner?.name}</Text>
                 <Text style={styles.ownerEmail}>{item.owner?.email}</Text>
                 <Text style={styles.ownerType}>{item.owner?.type}</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.requestActions}>
                 <TouchableOpacity
                   style={styles.approveBtn}
@@ -289,9 +324,79 @@ export default function VerifyScreen({ token }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* Vehicle Details Modal */}
+      <Modal visible={detailModal} transparent animationType="slide" onRequestClose={() => setDetailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxHeight: '85%' }]}>
+            <View style={styles.detailHeader}>
+              <Text style={styles.modalTitle}>Vehicle details</Text>
+              <TouchableOpacity onPress={() => setDetailModal(false)}>
+                <Ionicons name="close" size={24} color="#6B8080" />
+              </TouchableOpacity>
+            </View>
+
+            {detailLoading ? (
+              <ActivityIndicator size="large" color="#4CAF8A" style={{ marginVertical: 40 }} />
+            ) : detail ? (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.detailSectionTitle}>Vehicle</Text>
+                <DetailRow label="Plate number" value={detail.plateNumber} />
+                <DetailRow label="Make" value={detail.vehicleMake} />
+                <DetailRow label="Model" value={detail.vehicleModel} />
+                <DetailRow label="Colour" value={detail.vehicleColour} />
+                <DetailRow label="Status" value={detail.status} />
+                <DetailRow label="Registered on" value={detail.createdAt ? new Date(detail.createdAt).toLocaleString() : undefined} />
+
+                <Text style={[styles.detailSectionTitle, { marginTop: 16 }]}>Registered by</Text>
+                <DetailRow label="Name" value={detail.ownerName} />
+                <DetailRow label="Matric / Staff ID" value={detail.idNumber} />
+                <DetailRow label="Department / Faculty" value={detail.department} />
+                <DetailRow label="Phone" value={detail.phoneNumber} />
+
+                <Text style={[styles.detailSectionTitle, { marginTop: 16 }]}>Owner account</Text>
+                {Object.entries(detail.owner || {})
+                  .filter(([key]) => !HIDDEN_OWNER_KEYS.includes(key))
+                  .map(([key, value]) => (
+                    <DetailRow key={key} label={formatLabel(key)} value={formatValue(value)} />
+                  ))}
+
+                {detail.proofOfOwnershipUrl && (
+                  <>
+                    <Text style={[styles.detailSectionTitle, { marginTop: 16 }]}>Proof of ownership</Text>
+                    <TouchableOpacity onPress={() => Linking.openURL(`${API_URL}${detail.proofOfOwnershipUrl}`)}>
+                      <Text style={styles.proofLink}>Open document</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </ScrollView>
+            ) : (
+              <Text style={styles.emptyText}>No details found</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const HIDDEN_OWNER_KEYS = ['_id', '__v', 'password', 'refreshToken', 'tokens', 'createdAt', 'updatedAt'];
+
+const formatLabel = (key: string) =>
+  key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+
+const formatValue = (value: any) => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const DetailRow = ({ label, value }: { label: string; value?: string }) => (
+  <View style={styles.detailRow}>
+    <Text style={styles.detailLabel}>{label}</Text>
+    <Text style={styles.detailValue}>{value && value !== '' ? value : '—'}</Text>
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1C2B2B', padding: 24, paddingTop: 48 },
@@ -337,4 +442,10 @@ const styles = StyleSheet.create({
   modalCancelText: { color: '#6B8080', fontWeight: '700' },
   modalDeny: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#E05555' },
   modalDenyText: { color: '#fff', fontWeight: '700' },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  detailSectionTitle: { color: '#4CAF8A', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#2E4040', gap: 12 },
+  detailLabel: { color: '#6B8080', fontSize: 13, flexShrink: 0 },
+  detailValue: { color: '#E8F0EE', fontSize: 13, fontWeight: '600', flex: 1, textAlign: 'right' },
+  proofLink: { color: '#4CAF8A', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline', marginTop: 4 },
 });
